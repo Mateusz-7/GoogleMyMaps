@@ -1,4 +1,5 @@
 # import sys
+
 import requests
 from bs4 import BeautifulSoup
 from pyjsparser import PyJsParser
@@ -11,7 +12,7 @@ class GoogleMyMaps():
 
     def getFromMyMap(self, mapID):
         r = requests.get(
-            "https://www.google.com/maps/d/edit?hl=ja&mid=" + mapID)
+            "https://www.google.com/maps/d/edit?&mid=" + mapID)
         return r
 
     def parseData(self, r):
@@ -28,22 +29,49 @@ class GoogleMyMaps():
         data = eval(data)
         return data[1]
 
-    def parseLayerData(self, layerData):
-        # layerName = layerData[2]
+    @staticmethod
+    def get_place_type_and_cords(place):
+        if place[1] is not None:
+            return 'Point', place[1][0][0]
+        elif place[2] is not None:
+            return 'Line', [cord[0] for cord in place[2][0][0]]
+        elif place[3] is not None:
+            return 'Polygon', [cord[0] for cord in place[3][0][0][0][0]]
 
-        places = layerData[4]
-        # url = places[0][0]
+    @staticmethod
+    def extract_place_data(place_info):
+        place_data = {}
+        if len(place_info) > 1 and place_info[1] is not None:
+            place_data[place_info[1][0]] = place_info[1][1][place_info[1][2] - 1]
+        if len(place_info) > 3 and place_info[3] is not None:
+            for info in place_info[3]:
+                place_data[info[0]] = info[1][info[2] - 1]
+        return place_data if place_data else None
+
+    def parseLayerData(self, layerData):
+        # layerName = layerData[2] # TODO: Use
+
+        places = layerData[12][0][13][0]
+        # places_icons = layerData[12][0][13][1] -> [0][0]
 
         parsed = []
         for place in places:
-            placeName = place[5][0][0]
+            place_type, place_cords = self.get_place_type_and_cords(place)
 
-            info = place[4]
-            point = info[4]
+            place_info = place[5]
+            place_name = place_info[0][1][0]
+
+            place_photos = [photo[1] for photo in place_info[2]] \
+                if len(place_info) > 2 and place_info[2] is not None else None
+
+            place_data = self.extract_place_data(place_info)
 
             parsed.append({
-                "placeName": placeName,
-                "point": point,
+                "Cords": place_cords,
+                "Data": place_data,
+                "Name": place_name,
+                "Photos": place_photos,
+                "Type": place_type,
             })
 
         return parsed
@@ -55,8 +83,9 @@ class GoogleMyMaps():
             raise
 
         data = self.parseData(r)
+
         # mapID = data[1]
-        # mapName = data[2]
+        # mapName = data[2] # TODO: Use
 
         parsed = []
         for layer in layers:
