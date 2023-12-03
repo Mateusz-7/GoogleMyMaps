@@ -1,31 +1,31 @@
-# import sys
-
 import requests
 from bs4 import BeautifulSoup
 from pyjsparser import PyJsParser
 
 
-class GoogleMyMaps():
+class GoogleMyMaps:
 
     def __init__(self):
         self.parser = PyJsParser()
 
-    def getFromMyMap(self, mapID):
+    @staticmethod
+    def get_from_my_map(map_id):
         r = requests.get(
-            "https://www.google.com/maps/d/edit?&mid=" + mapID)
+            "https://www.google.com/maps/d/edit?&mid=" + map_id)
         return r
 
-    def parseData(self, r):
+    def parse_data(self, r):
         soup = BeautifulSoup(r.text, "html.parser")
         script = soup.find_all("script")[1].text
         js = self.parser.parse(script)
-        pagedata = js["body"][1]["declarations"][0]["init"]["value"]
+        page_data = js["body"][1]["declarations"][0]["init"]["value"]
 
-        data = pagedata.replace("true", "True")
+        data = page_data.replace("true", "True")
         data = data.replace("false", "False")
         data = data.replace("null", "None")
         data = data.replace("\n", "")
-        # exec("data = " + data)
+        data = data.replace('\xa0', ' ')
+
         data = eval(data)
         return data[1]
 
@@ -48,10 +48,10 @@ class GoogleMyMaps():
                 place_data[info[0]] = info[1][info[2] - 1]
         return place_data if place_data else None
 
-    def parseLayerData(self, layerData):
+    def parse_layer_data(self, layer_data):
         # layerName = layerData[2] # TODO: Use
 
-        places = layerData[12][0][13][0]
+        places = layer_data[12][0][13][0]
         # places_icons = layerData[12][0][13][1] -> [0][0]
 
         parsed = []
@@ -76,20 +76,19 @@ class GoogleMyMaps():
 
         return parsed
 
-    def get(self, mapID, layers=[0]):
-        r = self.getFromMyMap(mapID)
+    def get(self, map_id, layers=[0]):
+        r = self.get_from_my_map(map_id)
         if r.status_code != 200:
             print("status_code:", r.status_code)
             raise
 
-        data = self.parseData(r)
+        data = self.parse_data(r)
 
-        # mapID = data[1]
         # mapName = data[2] # TODO: Use
 
         parsed = []
         for layer in layers:
-            layerData = data[6][layer]
-            parsed += self.parseLayerData(layerData)
+            layer_data = data[6][layer]
+            parsed += self.parse_layer_data(layer_data)
 
         return parsed
